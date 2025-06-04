@@ -118,14 +118,6 @@ with col1:
         
         fig.update_layout(height=400)
         
-        # Adicionar linha "hoje"
-        fig.add_vline(
-            x=datetime.now().date(),
-            line_dash="dash",
-            line_color="red",
-            annotation_text="Hoje"
-        )
-        
         st.plotly_chart(fig, use_container_width=True)
     else:
         st.info("Adicione projetos na barra lateral para ver o cronograma!")
