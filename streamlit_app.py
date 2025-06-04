@@ -194,29 +194,40 @@ if not df.empty:
             text="Nome do Projeto"
         )
         
-        # Configurar altura e barra de rolagem - CORREÇÃO DEFINITIVA
+        # Configurar altura e mostrar ano completo - SEM BARRA DE ROLAGEM
         fig.update_layout(
-            height=800,  # Altura bem maior
+            height=600,
             xaxis=dict(
-                rangeslider=dict(
-                    visible=True,
-                    thickness=0.05,  # Barra muito fina
-                    bgcolor="lightgray",
-                    bordercolor="gray",
-                    borderwidth=1
-                ),
                 type="date",
-                title="📅 Cronograma",
-                domain=[0, 1]  # Usar todo o espaço horizontal
+                title="📅 Cronograma 2025",
+                # Definir range para mostrar o ano todo
+                range=[
+                    datetime(2025, 1, 1),  # Janeiro
+                    datetime(2025, 12, 31)  # Dezembro
+                ],
+                tickmode='array',
+                tickvals=[
+                    datetime(2025, 1, 15),   # Jan
+                    datetime(2025, 2, 15),   # Fev
+                    datetime(2025, 3, 15),   # Mar
+                    datetime(2025, 4, 15),   # Abr
+                    datetime(2025, 5, 15),   # Mai
+                    datetime(2025, 6, 15),   # Jun
+                    datetime(2025, 7, 15),   # Jul
+                    datetime(2025, 8, 15),   # Ago
+                    datetime(2025, 9, 15),   # Set
+                    datetime(2025, 10, 15),  # Out
+                    datetime(2025, 11, 15),  # Nov
+                    datetime(2025, 12, 15),  # Dez
+                ],
+                ticktext=['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 
+                         'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
             ),
             yaxis=dict(
-                title="🎯 Projetos",
-                domain=[0.15, 1]  # Deixar 15% do espaço na parte inferior para a barra de rolagem
+                title="🎯 Projetos"
             ),
             showlegend=False,
-            margin=dict(l=100, r=50, t=80, b=200),  # Margem inferior maior para a barra de rolagem
-            plot_bgcolor='white',
-            paper_bgcolor='white'
+            margin=dict(l=200, r=50, t=80, b=80)
         )
         
         # Configurar texto nas barras - NEGRITO E MAIOR
@@ -226,21 +237,21 @@ if not df.empty:
             texttemplate="<b>%{text}</b>"  # Forçar negrito no texto
         )
         
-        # Adicionar linha "HOJE" de forma mais simples - SEM CONFLITO COM BARRA DE ROLAGEM
+        # LINHA VERMELHA "HOJE" BEM GROSSA E VISÍVEL
         hoje = datetime.now()
-        fig.add_annotation(
+        fig.add_vline(
             x=hoje,
-            y=len(df),  # Posicionar acima do último projeto
-            text="📍 HOJE",
-            showarrow=True,
-            arrowhead=2,
-            arrowcolor="red",
-            arrowsize=1,
-            arrowwidth=2,
-            bgcolor="red",
-            bordercolor="red",
-            font=dict(color="white", size=10),
-            yshift=10
+            line_width=6,  # LINHA BEM GROSSA
+            line_color="red",
+            line_dash="solid",  # Linha sólida em vez de tracejada
+            annotation_text="🔴 HOJE",
+            annotation_position="top",
+            annotation=dict(
+                font=dict(size=14, color="red", family="Arial Black"),
+                bgcolor="white",
+                bordercolor="red",
+                borderwidth=2
+            )
         )
         
         st.plotly_chart(fig, use_container_width=True)
