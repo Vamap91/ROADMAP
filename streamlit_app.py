@@ -1,260 +1,391 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import datetime
+import plotly.graph_objects as go
+from datetime import datetime, timedelta
 import os
+import json
 
-# --- Configurações da Página ---
-st.set_page_config(layout="wide", page_title="ROADMAP Interativa 🚀", initial_sidebar_state="expanded")
+# Configuração da página
+st.set_page_config(
+    page_title="🚀 ROADMAP de Projetos",
+    page_icon="🚀",
+    layout="wide"
+)
 
-# --- Caminho para o arquivo de dados ---
-DATA_DIR = "data"
-PROJECTS_FILE = os.path.join(DATA_DIR, "projects.csv") # Usaremos CSV para simplicidade
-
-# Garante que a pasta 'data' exista
-os.makedirs(DATA_DIR, exist_ok=True)
-
-# --- Funções de Carregamento e Salvamento de Dados ---
-@st.cache_data(show_spinner=False) # Cache para carregar dados apenas uma vez
-def load_projects_data():
-    if os.path.exists(PROJECTS_FILE):
-        df = pd.read_csv(PROJECTS_FILE)
-        # Converte colunas de data para o formato datetime
-        df['Início Previsto'] = pd.to_datetime(df['Início Previsto'])
-        df['Fim Previsto'] = pd.to_datetime(df['Fim Previsto'])
-        return df
-    else:
-        # Dados iniciais se o arquivo não existir
-        initial_data = {
-            'Projeto': ['Lançamento App V1', 'Melhoria UX Dashboard', 'Integração API Externa', 'Campanha Marketing Q3', 'Revisão Processo Interno', 'Entrega MVP Feature X'],
-            'Início Previsto': ['2025-01-01', '2025-02-15', '2025-03-10', '2025-04-01', '2025-05-01', '2025-06-01'],
-            'Fim Previsto': ['2025-03-31', '2025-04-30', '2025-05-20', '2025-06-15', '2025-07-31', '2025-06-20'],
-            'Responsável/Status': ['Pilotando', 'Em desenvolvimento TI', 'Em desenvolvimento Vini', 'Entregue', 'Em Análise', 'Entrega de MVP']
-        }
-        df = pd.DataFrame(initial_data)
-        df['Início Previsto'] = pd.to_datetime(df['Início Previsto'])
-        df['Fim Previsto'] = pd.to_datetime(df['Fim Previsto'])
-        df.to_csv(PROJECTS_FILE, index=False) # Salva os dados iniciais
-        return df
-
-def save_projects_data(df):
-    # Converte de volta para string para salvar no CSV de forma consistente
-    df_to_save = df.copy() # Cria uma cópia para não alterar o DataFrame em memória que está em datetime
-    df_to_save['Início Previsto'] = df_to_save['Início Previsto'].dt.strftime('%Y-%m-%d')
-    df_to_save['Fim Previsto'] = df_to_save['Fim Previsto'].dt.strftime('%Y-%m-%d')
-    df_to_save.to_csv(PROJECTS_FILE, index=False)
-    # Recarrega o DataFrame após salvar para garantir que o cache e o session_state estejam atualizados
-    st.session_state['projects_df'] = load_projects_data()
-
-# Inicializa o DataFrame no session_state para persistir durante a sessão
-# Isso é crucial para que o estado do DataFrame não se perca após updates
+# Inicialização do estado da sessão
 if 'projects_df' not in st.session_state:
-    st.session_state['projects_df'] = load_projects_data()
+    st.session_state.projects_df = None
+if 'color_mapping' not in st.session_state:
+    st.session_state.color_mapping = {}
 
-df_projects = st.session_state['projects_df']
+def ensure_data_directory():
+    """Garante que o diretório data/ existe"""
+    if not os.path.exists('data'):
+        os.makedirs('data')
 
-# --- Definição de Cores e Legenda (Configurável) ---
-st.sidebar.header("🎨 Configuração de Cores")
-st.sidebar.markdown("Defina as cores para cada status/responsável.")
-
-# Dicionário padrão de cores (pode ser editado na UI)
-default_color_map = {
-    'Pilotando': '#1f77b4',          # Azul
-    'Em desenvolvimento TI': '#d62728',     # Vermelho
-    'Em desenvolvimento Vini': '#2ca02c',  # Verde
-    'Entregue': '#ff7f0e',           # Laranja
-    'Entrega de MVP': '#9467bd',     # Roxo
-    'Em Análise': '#8c564b',         # Marrom
-    'Concluído': '#17becf',          # Ciano
-    'Atrasado': '#e377c2',           # Rosa
-    'Não Iniciado': '#7f7f7f',       # Cinza
-}
-
-# Pegar todos os valores únicos de 'Responsável/Status' do DataFrame
-# Garante que todos os status, inclusive os de novos projetos, apareçam na sidebar
-all_statuses = sorted(df_projects['Responsável/Status'].unique().tolist()) # Ordena para consistência
-configured_colors = {}
-
-for status in all_statuses:
-    # Use st.color_picker para permitir a seleção de cores pelo usuário
-    configured_colors[status] = st.sidebar.color_picker(
-        f"Cor para '{status}'",
-        value=default_color_map.get(status, '#CCCCCC'), # Usa cor padrão ou cinza claro
-        key=f"color_picker_{status}" # Adiciona uma key única para o color_picker
-    )
-
-st.sidebar.markdown("---") # Linha divisória na sidebar
-
-# --- Título Principal ---
-st.title("ROADMAP de Projetos 📈")
-st.markdown("Visualize e gerencie o cronograma dos seus projetos de forma interativa.")
-
-# --- Seção do Gráfico de Gantt ---
-st.header("Visualização da Roadmap")
-
-fig = px.timeline(
-    df_projects,
-    x_start="Início Previsto",
-    x_end="Fim Previsto",
-    y="Projeto",
-    color="Responsável/Status", # Coluna usada para colorir as barras
-    color_discrete_map=configured_colors, # Usamos o mapa de cores configurado
-    hover_name="Projeto",
-    hover_data={
-        "Início Previsto": "|%d/%m/%Y",
-        "Fim Previsto": "|%d/%m/%Y",
-        "Responsável/Status": True
-    },
-    title="Cronograma Detalhado dos Projetos"
-)
-
-# Inverter o eixo Y para que os projetos mais recentes apareçam no topo
-fig.update_yaxes(autorange="reversed")
-
-# Adicionar uma linha para a data atual (hoje)
-today = datetime.datetime.now()
-fig.add_vline(
-    x=today.timestamp() * 1000, # Plotly usa milissegundos para timestamps
-    line_dash="dash",
-    line_color="red",
-    annotation_text=f"Hoje: {today.strftime('%d/%m/%Y')}",
-    annotation_position="top left",
-    annotation_font_color="red"
-)
-
-# Layout do Plotly
-fig.update_layout(
-    xaxis_title="Período",
-    yaxis_title="Projeto",
-    hovermode="x unified",
-    height=500 # Altura fixa para melhor visualização
-)
-
-# Exibir o gráfico no Streamlit
-st.plotly_chart(fig, use_container_width=True)
-
-
-# --- Separador Visual (linha horizontal) ---
-st.markdown("---") 
-
-# --- Seção de Edição e Gerenciamento de Projetos ---
-st.markdown("## 🚀 Edição e Gerenciamento de Projetos")
-st.markdown("Aqui você pode **adicionar novos projetos**, **atualizar prazos** e **responsáveis**.")
-
-# Usamos um container para agrupar os elementos de edição
-with st.container(border=True):
-    st.subheader("📝 Editar Projetos Existentes")
-
-    # Opção de edição via selectbox
-    # Garante que o selectbox não tenta selecionar um projeto que não existe mais após uma deleção (se implementado)
-    if not df_projects.empty:
-        selected_project_name = st.selectbox(
-            "Selecione um projeto para atualizar:",
-            options=df_projects['Projeto'].tolist(),
-            key="project_selector" # Chave única para o widget
-        )
-    else:
-        selected_project_name = None
-        st.info("Nenhum projeto para editar. Adicione um novo projeto abaixo!")
-
-    # Encontrar o projeto selecionado e exibir seus detalhes para edição
-    if selected_project_name:
-        project_index = df_projects[df_projects['Projeto'] == selected_project_name].index[0]
-        
-        # Recupera os valores atuais
-        # Garante que as datas sejam objects do tipo date para st.date_input
-        current_start = df_projects.loc[project_index, 'Início Previsto'].date()
-        current_end = df_projects.loc[project_index, 'Fim Previsto'].date()
-        current_status_resp = df_projects.loc[project_index, 'Responsável/Status']
-
-        # Campos de entrada para as novas datas e status/responsável
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            new_start_date = st.date_input(
-                "Início Previsto",
-                value=current_start,
-                key=f"start_{selected_project_name}_edit" # Chave única para o widget
-            )
-        with col2:
-            new_end_date = st.date_input(
-                "Fim Previsto",
-                value=current_end,
-                key=f"end_{selected_project_name}_edit" # Chave única para o widget
-            )
-        with col3:
-            # Garante que as options do selectbox são os valores únicos + os valores que você configurou
-            # Isso permite adicionar novos "responsáveis/status" ao digitar no "Adicionar Novo Projeto"
-            all_possible_statuses = sorted(list(set(df_projects['Responsável/Status'].unique().tolist() + list(default_color_map.keys()))))
-            if current_status_resp not in all_possible_statuses:
-                all_possible_statuses.insert(0, current_status_resp) # Garante que o valor atual esteja na lista
-
-            new_status_resp = st.selectbox(
-                "Responsável / Status",
-                options=all_possible_statuses,
-                index=all_possible_statuses.index(current_status_resp) if current_status_resp in all_possible_statuses else 0,
-                key=f"status_resp_{selected_project_name}_edit" # Chave única para o widget
-            )
-        
-        # Botão para salvar as alterações
-        if st.button(f"💾 Salvar Alterações para '{selected_project_name}'", key=f"save_btn_{selected_project_name}"):
-            # Atualiza o DataFrame no session_state diretamente
-            st.session_state['projects_df'].loc[project_index, 'Início Previsto'] = new_start_date
-            st.session_state['projects_df'].loc[project_index, 'Fim Previsto'] = new_end_date
-            st.session_state['projects_df'].loc[project_index, 'Responsável/Status'] = new_status_resp
-            
-            save_projects_data(st.session_state['projects_df']) # Salva no CSV
-            st.success(f"✅ Projeto '{selected_project_name}' atualizado e salvo!")
-            st.rerun() # Força a aplicação a recarregar e mostrar as mudanças
-
-# --- Separador Visual (linha horizontal) ---
-st.markdown("---")
-
-# --- Seção de Adição de Novo Projeto ---
-st.markdown("## ✨ Adicionar Novo Projeto")
-
-with st.container(border=True):
-    st.subheader("➕ Adicionar um Novo Projeto")
+def load_projects():
+    """Carrega projetos do arquivo CSV ou cria dados de exemplo"""
+    ensure_data_directory()
+    csv_path = 'data/projects.csv'
     
-    with st.form("add_project_form"):
-        new_project_name = st.text_input("Nome do Novo Projeto", key="new_project_name_input")
-        col_new1, col_new2, col_new3 = st.columns(3)
-        with col_new1:
-            new_project_start = st.date_input("Início Previsto", value=datetime.date.today(), key="new_project_start_input")
-        with col_new2:
-            new_project_end = st.date_input("Fim Previsto", value=datetime.date.today() + datetime.timedelta(days=30), key="new_project_end_input")
-        with col_new3:
-            # Opções para o novo projeto, incluindo uma para o usuário digitar um novo status
-            # Criamos uma lista combinando os status existentes e uma opção para "Outro (digite abaixo)"
-            all_possible_statuses = sorted(list(set(df_projects['Responsável/Status'].unique().tolist() + list(default_color_map.keys()))))
+    if os.path.exists(csv_path):
+        try:
+            df = pd.read_csv(csv_path)
+            df['Início Previsto'] = pd.to_datetime(df['Início Previsto'])
+            df['Fim Previsto'] = pd.to_datetime(df['Fim Previsto'])
+            return df
+        except Exception as e:
+            st.error(f"Erro ao carregar projetos: {e}")
+            return create_sample_data()
+    else:
+        return create_sample_data()
+
+def create_sample_data():
+    """Cria dados de exemplo para inicialização"""
+    today = datetime.now().date()
+    sample_data = {
+        'Nome do Projeto': [
+            'Sistema de Autenticação',
+            'API de Pagamentos',
+            'Dashboard Analytics',
+            'Mobile App MVP',
+            'Integração ERP'
+        ],
+        'Início Previsto': [
+            today,
+            today + timedelta(days=30),
+            today + timedelta(days=60),
+            today + timedelta(days=90),
+            today + timedelta(days=120)
+        ],
+        'Fim Previsto': [
+            today + timedelta(days=45),
+            today + timedelta(days=75),
+            today + timedelta(days=105),
+            today + timedelta(days=135),
+            today + timedelta(days=180)
+        ],
+        'Responsável/Status': [
+            'Backend Team',
+            'FinTech Team',
+            'Data Team',
+            'Mobile Team',
+            'Integration Team'
+        ]
+    }
+    
+    df = pd.DataFrame(sample_data)
+    save_projects(df)
+    return df
+
+def save_projects(df):
+    """Salva projetos no arquivo CSV"""
+    ensure_data_directory()
+    csv_path = 'data/projects.csv'
+    try:
+        df.to_csv(csv_path, index=False)
+        return True
+    except Exception as e:
+        st.error(f"Erro ao salvar projetos: {e}")
+        return False
+
+def load_color_mapping():
+    """Carrega mapeamento de cores do arquivo JSON"""
+    ensure_data_directory()
+    json_path = 'data/color_mapping.json'
+    
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, 'r') as f:
+                return json.load(f)
+        except:
+            return {}
+    return {}
+
+def save_color_mapping(color_mapping):
+    """Salva mapeamento de cores no arquivo JSON"""
+    ensure_data_directory()
+    json_path = 'data/color_mapping.json'
+    try:
+        with open(json_path, 'w') as f:
+            json.dump(color_mapping, f)
+    except Exception as e:
+        st.error(f"Erro ao salvar cores: {e}")
+
+def create_gantt_chart(df, color_mapping):
+    """Cria o gráfico de Gantt com Plotly"""
+    if df.empty:
+        return go.Figure()
+    
+    # Preparar dados para o gráfico
+    gantt_data = []
+    for idx, row in df.iterrows():
+        gantt_data.append({
+            'Task': row['Nome do Projeto'],
+            'Start': row['Início Previsto'],
+            'Finish': row['Fim Previsto'],
+            'Resource': row['Responsável/Status'],
+            'Description': f"Projeto: {row['Nome do Projeto']}<br>Responsável: {row['Responsável/Status']}<br>Duração: {(row['Fim Previsto'] - row['Início Previsto']).days} dias"
+        })
+    
+    gantt_df = pd.DataFrame(gantt_data)
+    
+    # Criar cores para cada responsável/status
+    unique_resources = gantt_df['Resource'].unique()
+    colors = []
+    for resource in unique_resources:
+        if resource in color_mapping:
+            colors.append(color_mapping[resource])
+        else:
+            # Cores padrão se não definida
+            default_colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8']
+            colors.append(default_colors[len(colors) % len(default_colors)])
+    
+    # Criar gráfico de Gantt
+    fig = px.timeline(
+        gantt_df,
+        x_start="Start",
+        x_end="Finish",
+        y="Task",
+        color="Resource",
+        color_discrete_sequence=colors,
+        title="📊 ROADMAP de Projetos - Cronograma Geral",
+        hover_data=["Description"]
+    )
+    
+    # Configurações do layout
+    fig.update_layout(
+        height=600,
+        xaxis_title="📅 Cronograma",
+        yaxis_title="🎯 Projetos",
+        font=dict(size=12),
+        title_font_size=20,
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        )
+    )
+    
+    # Adicionar linha vertical para "hoje"
+    today = datetime.now()
+    fig.add_vline(
+        x=today,
+        line_dash="dash",
+        line_color="red",
+        line_width=2,
+        annotation_text="📍 Hoje",
+        annotation_position="top"
+    )
+    
+    # Configurar hover
+    fig.update_traces(
+        hovertemplate="<b>%{y}</b><br>" +
+                      "Início: %{x}<br>" +
+                      "Fim: %{x2}<br>" +
+                      "<extra></extra>"
+    )
+    
+    return fig
+
+def main():
+    # Header principal
+    st.title("🚀 Sistema de ROADMAP de Projetos")
+    st.markdown("### Gerencie e visualize o cronograma dos seus projetos de forma interativa")
+    
+    # Carregar dados
+    if st.session_state.projects_df is None:
+        st.session_state.projects_df = load_projects()
+        st.session_state.color_mapping = load_color_mapping()
+    
+    df = st.session_state.projects_df
+    
+    # Sidebar para configurações
+    with st.sidebar:
+        st.header("🎨 Configurações de Cores")
+        
+        # Obter responsáveis únicos
+        unique_responsaveis = df['Responsável/Status'].unique() if not df.empty else []
+        
+        # Configurar cores para cada responsável
+        color_mapping = st.session_state.color_mapping.copy()
+        
+        for responsavel in unique_responsaveis:
+            default_color = color_mapping.get(responsavel, '#FF6B6B')
+            color = st.color_picker(
+                f"Cor para {responsavel}",
+                value=default_color,
+                key=f"color_{responsavel}"
+            )
+            color_mapping[responsavel] = color
+        
+        # Adicionar novo responsável/status
+        st.subheader("➕ Adicionar Novo Status")
+        new_status = st.text_input("Nome do novo status/responsável:")
+        if new_status and new_status not in unique_responsaveis:
+            new_color = st.color_picker(f"Cor para {new_status}", value='#FF6B6B')
+            if st.button("Adicionar Status"):
+                color_mapping[new_status] = new_color
+                st.success(f"Status '{new_status}' adicionado!")
+        
+        # Salvar configurações de cor
+        if color_mapping != st.session_state.color_mapping:
+            st.session_state.color_mapping = color_mapping
+            save_color_mapping(color_mapping)
+    
+    # Área principal dividida em colunas
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        # Gráfico de Gantt
+        st.subheader("📊 Visualização do Cronograma")
+        if not df.empty:
+            fig = create_gantt_chart(df, st.session_state.color_mapping)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Nenhum projeto encontrado. Adicione um novo projeto para começar!")
+    
+    with col2:
+        # Estatísticas rápidas
+        st.subheader("📈 Estatísticas")
+        if not df.empty:
+            total_projetos = len(df)
+            projetos_em_andamento = len(df[
+                (df['Início Previsto'] <= pd.Timestamp.now()) & 
+                (df['Fim Previsto'] >= pd.Timestamp.now())
+            ])
+            projetos_futuros = len(df[df['Início Previsto'] > pd.Timestamp.now()])
             
-            selected_new_status = st.selectbox(
-                "Responsável / Status",
-                options=all_possible_statuses + ["Outro (digite abaixo)"],
-                key="new_project_status_select"
+            st.metric("Total de Projetos", total_projetos)
+            st.metric("Em Andamento", projetos_em_andamento)
+            st.metric("Futuros", projetos_futuros)
+            
+            # Responsáveis únicos
+            st.write("**👥 Responsáveis:**")
+            for resp in df['Responsável/Status'].unique():
+                count = len(df[df['Responsável/Status'] == resp])
+                st.write(f"• {resp}: {count} projeto(s)")
+    
+    # Seção de edição de projetos
+    st.header("✏️ Gerenciar Projetos")
+    
+    tab1, tab2 = st.tabs(["📝 Editar Projeto Existente", "➕ Adicionar Novo Projeto"])
+    
+    with tab1:
+        if not df.empty:
+            selected_project = st.selectbox(
+                "Selecione um projeto para editar:",
+                df['Nome do Projeto'].tolist()
             )
             
-            new_project_status_resp = selected_new_status
-            # Se o usuário selecionou "Outro", permite que ele digite o novo status
-            if selected_new_status == "Outro (digite abaixo)":
-                custom_status = st.text_input("Digite o novo status/responsável:", key="custom_status_input")
-                if custom_status: # Só usa o custom_status se algo foi digitado
-                    new_project_status_resp = custom_status
+            if selected_project:
+                project_row = df[df['Nome do Projeto'] == selected_project].iloc[0]
+                
+                with st.form("edit_project_form"):
+                    st.subheader(f"Editando: {selected_project}")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        new_start = st.date_input(
+                            "Início Previsto:",
+                            value=project_row['Início Previsto'].date()
+                        )
+                    with col2:
+                        new_end = st.date_input(
+                            "Fim Previsto:",
+                            value=project_row['Fim Previsto'].date()
+                        )
+                    
+                    # Lista de responsáveis (incluindo novos adicionados)
+                    all_responsaveis = list(df['Responsável/Status'].unique()) + list(st.session_state.color_mapping.keys())
+                    all_responsaveis = list(set(all_responsaveis))  # Remove duplicatas
+                    
+                    current_responsavel = project_row['Responsável/Status']
+                    if current_responsavel in all_responsaveis:
+                        default_index = all_responsaveis.index(current_responsavel)
+                    else:
+                        default_index = 0
+                    
+                    new_responsavel = st.selectbox(
+                        "Responsável/Status:",
+                        all_responsaveis,
+                        index=default_index
+                    )
+                    
+                    submitted = st.form_submit_button("💾 Salvar Alterações")
+                    
+                    if submitted:
+                        if new_start <= new_end:
+                            # Atualizar projeto
+                            df.loc[df['Nome do Projeto'] == selected_project, 'Início Previsto'] = pd.Timestamp(new_start)
+                            df.loc[df['Nome do Projeto'] == selected_project, 'Fim Previsto'] = pd.Timestamp(new_end)
+                            df.loc[df['Nome do Projeto'] == selected_project, 'Responsável/Status'] = new_responsavel
+                            
+                            # Salvar e atualizar estado
+                            if save_projects(df):
+                                st.session_state.projects_df = df
+                                st.success("✅ Projeto atualizado com sucesso!")
+                                st.rerun()
+                            else:
+                                st.error("❌ Erro ao salvar o projeto.")
+                        else:
+                            st.error("❌ A data de início deve ser anterior à data de fim.")
+        else:
+            st.info("Nenhum projeto disponível para edição.")
+    
+    with tab2:
+        with st.form("new_project_form"):
+            st.subheader("Criar Novo Projeto")
+            
+            project_name = st.text_input("Nome do Projeto:")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                start_date = st.date_input("Início Previsto:")
+            with col2:
+                end_date = st.date_input("Fim Previsto:")
+            
+            # Lista de responsáveis disponíveis
+            all_responsaveis = list(set(df['Responsável/Status'].unique().tolist() + list(st.session_state.color_mapping.keys())))
+            if not all_responsaveis:
+                all_responsaveis = ['Backend Team', 'Frontend Team', 'Data Team', 'Mobile Team']
+            
+            responsavel = st.selectbox("Responsável/Status:", all_responsaveis)
+            
+            submitted = st.form_submit_button("🚀 Criar Projeto")
+            
+            if submitted:
+                if project_name.strip():
+                    if project_name not in df['Nome do Projeto'].values:
+                        if start_date <= end_date:
+                            # Criar novo projeto
+                            new_project = pd.DataFrame({
+                                'Nome do Projeto': [project_name],
+                                'Início Previsto': [pd.Timestamp(start_date)],
+                                'Fim Previsto': [pd.Timestamp(end_date)],
+                                'Responsável/Status': [responsavel]
+                            })
+                            
+                            # Adicionar ao DataFrame
+                            updated_df = pd.concat([df, new_project], ignore_index=True)
+                            
+                            # Salvar e atualizar estado
+                            if save_projects(updated_df):
+                                st.session_state.projects_df = updated_df
+                                st.success("✅ Novo projeto criado com sucesso!")
+                                st.rerun()
+                            else:
+                                st.error("❌ Erro ao salvar o novo projeto.")
+                        else:
+                            st.error("❌ A data de início deve ser anterior à data de fim.")
+                    else:
+                        st.error("❌ Já existe um projeto com este nome.")
+                else:
+                    st.error("❌ O nome do projeto não pode estar vazio.")
 
-        submitted = st.form_submit_button("Criar Novo Projeto")
-        if submitted:
-            if not new_project_name:
-                st.error("❗ O nome do projeto não pode ser vazio.")
-            elif new_project_name in df_projects['Projeto'].tolist():
-                st.warning("⚠️ Um projeto com esse nome já existe. Por favor, escolha outro nome.")
-            else:
-                new_row = pd.DataFrame([{
-                    'Projeto': new_project_name,
-                    'Início Previsto': new_project_start,
-                    'Fim Previsto': new_project_end,
-                    'Responsável/Status': new_project_status_resp
-                }])
-                # Concatena com o DataFrame no session_state
-                st.session_state['projects_df'] = pd.concat([st.session_state['projects_df'], new_row], ignore_index=True)
-                save_projects_data(st.session_state['projects_df']) # Salva no CSV
-                st.success(f"🎉 Projeto '{new_project_name}' adicionado e salvo!")
-                st.rerun() # Força a aplicação a recarregar
+if __name__ == "__main__":
+    main()
