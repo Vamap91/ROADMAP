@@ -127,7 +127,7 @@ fig.update_layout(
 # Exibir o gráfico no Streamlit
 st.plotly_chart(fig, use_container_width=True)
 
----
+
 
 # ## 🚀 Edição e Gerenciamento de Projetos
 
