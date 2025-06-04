@@ -129,7 +129,7 @@ st.plotly_chart(fig, use_container_width=True)
 
 ---
 
-## 🚀 Edição e Gerenciamento de Projetos
+# ## 🚀 Edição e Gerenciamento de Projetos
 
 st.markdown("Aqui você pode **adicionar novos projetos**, **atualizar prazos** e **responsáveis**.")
 
