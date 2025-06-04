@@ -114,36 +114,76 @@ if 'df_projetos' not in st.session_state:
 
 df = st.session_state.df_projetos
 
-# Sidebar para adicionar projeto
+# Sidebar para adicionar projeto - AGORA OCULTÁVEL
 with st.sidebar:
-    st.header("➕ Novo Projeto")
+    # Botão para mostrar/ocultar criação de projeto
+    if 'mostrar_criar_projeto' not in st.session_state:
+        st.session_state.mostrar_criar_projeto = False
     
-    with st.form("novo_projeto"):
-        nome = st.text_input("Nome do Projeto:")
-        inicio = st.date_input("Data de Início:")
-        fim = st.date_input("Data de Fim:")
-        responsavel = st.selectbox("Responsável:", [
-            'Backend Team', 'Frontend Team', 'Data Team', 
-            'Mobile Team', 'QA Team', 'DevOps Team'
-        ])
+    if st.button("➕ Mostrar/Ocultar Criar Projeto"):
+        st.session_state.mostrar_criar_projeto = not st.session_state.mostrar_criar_projeto
+    
+    if st.session_state.mostrar_criar_projeto:
+        st.header("➕ Novo Projeto")
         
-        if st.form_submit_button("🚀 Criar Projeto"):
-            if nome and inicio <= fim:
-                novo_id = obter_proximo_id(df)
-                novo_projeto = pd.DataFrame({
-                    'ID': [novo_id],
-                    'Nome do Projeto': [nome],
-                    'Início': [inicio],
-                    'Fim': [fim],
-                    'Responsável': [responsavel]
-                })
-                
-                st.session_state.df_projetos = pd.concat([df, novo_projeto], ignore_index=True)
-                if salvar_dados(st.session_state.df_projetos):
-                    st.success("✅ Projeto criado e salvo!")
-                    st.rerun()
-            else:
-                st.error("❌ Verifique os dados!")
+        with st.form("novo_projeto"):
+            nome = st.text_input("Nome do Projeto:")
+            inicio = st.date_input("Data de Início:")
+            fim = st.date_input("Data de Fim:")
+            responsavel = st.selectbox("Responsável:", [
+                'Backend Team', 'Frontend Team', 'Data Team', 
+                'Mobile Team', 'QA Team', 'DevOps Team'
+            ])
+            
+            if st.form_submit_button("🚀 Criar Projeto"):
+                if nome and inicio <= fim:
+                    novo_id = obter_proximo_id(df)
+                    novo_projeto = pd.DataFrame({
+                        'ID': [novo_id],
+                        'Nome do Projeto': [nome],
+                        'Início': [inicio],
+                        'Fim': [fim],
+                        'Responsável': [responsavel]
+                    })
+                    
+                    st.session_state.df_projetos = pd.concat([df, novo_projeto], ignore_index=True)
+                    if salvar_dados(st.session_state.df_projetos):
+                        st.success("✅ Projeto criado e salvo!")
+                        st.rerun()
+                else:
+                    st.error("❌ Verifique os dados!")
+    else:
+        st.info("👆 Clique no botão acima para criar novos projetos")
+    
+    # Seção de cores personalizadas
+    st.markdown("---")
+    st.header("🎨 Cores dos Projetos")
+    
+    # Cores padrão para cada responsável
+    cores_padrao = {
+        'Backend Team': '#FF6B6B',
+        'Frontend Team': '#4ECDC4', 
+        'Data Team': '#45B7D1',
+        'Mobile Team': '#96CEB4',
+        'QA Team': '#FFEAA7',
+        'DevOps Team': '#DDA0DD'
+    }
+    
+    # Inicializar cores no session_state se não existir
+    if 'cores_personalizadas' not in st.session_state:
+        st.session_state.cores_personalizadas = cores_padrao.copy()
+    
+    # Mostrar seletores de cor para cada responsável
+    responsaveis_unicos = df['Responsável'].unique() if not df.empty else list(cores_padrao.keys())
+    
+    for responsavel in responsaveis_unicos:
+        cor_atual = st.session_state.cores_personalizadas.get(responsavel, cores_padrao.get(responsavel, '#FF6B6B'))
+        nova_cor = st.color_picker(
+            f"🎨 {responsavel}:",
+            value=cor_atual,
+            key=f"cor_{responsavel}"
+        )
+        st.session_state.cores_personalizadas[responsavel] = nova_cor
 
 # Área principal - FOCO TOTAL NOS PROJETOS
 st.subheader("📊 Cronograma dos Projetos")
