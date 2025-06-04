@@ -11,8 +11,13 @@ st.set_page_config(
     layout="wide"
 )
 
-# Caminho do "banco de dados" CSV no seu PC
-CAMINHO_DADOS = r"C:\Users\vpaschoa\OneDrive - CARGLASS AUTOMOTIVA LTDA\Documentos\roadmap_projetos.csv"
+# Caminho do "banco de dados" CSV (adaptado para funcionar local e na nuvem)
+import platform
+if platform.system() == "Windows":
+    CAMINHO_DADOS = r"C:\Users\vpaschoa\OneDrive - CARGLASS AUTOMOTIVA LTDA\Documentos\roadmap_projetos.csv"
+else:
+    # Para Streamlit Cloud ou outros sistemas
+    CAMINHO_DADOS = "data/roadmap_projetos.csv"
 
 # Função para criar dados de exemplo
 def criar_dados_exemplo():
@@ -46,25 +51,40 @@ def criar_dados_exemplo():
     }
     return pd.DataFrame(dados)
 
-# Função para salvar dados no CSV do seu PC
+# Função para salvar dados no CSV (adaptado para funcionar local e na nuvem)
 def salvar_dados(df):
     try:
         # Garantir que o diretório existe
         diretorio = os.path.dirname(CAMINHO_DADOS)
-        os.makedirs(diretorio, exist_ok=True)
+        if diretorio:  # Só criar se o diretório não estiver vazio
+            os.makedirs(diretorio, exist_ok=True)
         
         # Salvar no CSV
         df.to_csv(CAMINHO_DADOS, index=False)
         return True
     except Exception as e:
         st.error(f"❌ Erro ao salvar: {e}")
-        return False
+        # Fallback: salvar localmente
+        try:
+            os.makedirs('data', exist_ok=True)
+            df.to_csv('data/roadmap_projetos.csv', index=False)
+            st.info("💾 Dados salvos localmente em 'data/roadmap_projetos.csv'")
+            return True
+        except Exception as e2:
+            st.error(f"❌ Erro também no salvamento local: {e2}")
+            return False
 
-# Função para carregar dados do CSV do seu PC
+# Função para carregar dados do CSV (adaptado para funcionar local e na nuvem)
 def carregar_dados():
     try:
         if os.path.exists(CAMINHO_DADOS):
             df = pd.read_csv(CAMINHO_DADOS)
+            df['Início'] = pd.to_datetime(df['Início']).dt.date
+            df['Fim'] = pd.to_datetime(df['Fim']).dt.date
+            return df
+        elif os.path.exists('data/roadmap_projetos.csv'):
+            # Fallback: carregar do arquivo local
+            df = pd.read_csv('data/roadmap_projetos.csv')
             df['Início'] = pd.to_datetime(df['Início']).dt.date
             df['Fim'] = pd.to_datetime(df['Fim']).dt.date
             return df
@@ -236,12 +256,20 @@ if not df.empty:
                     )
                 
                 with col_edit2:
+                    opcoes_responsavel = ['Backend Team', 'Frontend Team', 'Data Team', 
+                                        'Mobile Team', 'QA Team', 'DevOps Team']
+                    
+                    # Buscar índice do responsável atual de forma segura
+                    try:
+                        indice_atual = opcoes_responsavel.index(projeto_atual['Responsável'])
+                    except ValueError:
+                        # Se não encontrar, usar 0 como padrão
+                        indice_atual = 0
+                    
                     novo_responsavel = st.selectbox(
                         "Responsável:",
-                        ['Backend Team', 'Frontend Team', 'Data Team', 
-                         'Mobile Team', 'QA Team', 'DevOps Team'],
-                        index=['Backend Team', 'Frontend Team', 'Data Team', 
-                               'Mobile Team', 'QA Team', 'DevOps Team'].index(projeto_atual['Responsável'])
+                        opcoes_responsavel,
+                        index=indice_atual
                     )
                     nova_data_fim = st.date_input(
                         "Data de Fim:", 
