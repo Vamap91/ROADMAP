@@ -194,21 +194,24 @@ if not df.empty:
             text="Nome do Projeto"
         )
         
-        # Configurar altura e barra de rolagem - CORRIGINDO OVERLAP
+        # Configurar altura e barra de rolagem - LAYOUT OTIMIZADO
         fig.update_layout(
-            height=600,  # Altura maior para melhor visualização
+            height=700,  # Altura maior para acomodar tudo
             xaxis=dict(
                 rangeslider=dict(
                     visible=True,
-                    thickness=0.1  # Fazer a barra de rolagem mais fina
+                    thickness=0.08  # Barra de rolagem bem fina
                 ),
-                type="date"
+                type="date",
+                title="📅 Cronograma"
             ),
-            showlegend=False,  # Remover legenda já que cada projeto tem cor única
-            margin=dict(l=250, r=50, t=80, b=150),  # Aumentar margem esquerda e inferior
             yaxis=dict(
-                side="left"  # Garantir que os nomes fiquem à esquerda
-            )
+                title="🎯 Projetos",
+                automargin=True  # Margem automática para nomes
+            ),
+            showlegend=False,
+            margin=dict(l=50, r=50, t=100, b=120),  # Margens balanceadas
+            autosize=True
         )
         
         # Configurar texto nas barras - NEGRITO E MAIOR
@@ -218,16 +221,21 @@ if not df.empty:
             texttemplate="<b>%{text}</b>"  # Forçar negrito no texto
         )
         
-        # Adicionar linha vermelha "HOJE" de forma simples e segura
+        # Adicionar linha "HOJE" de forma mais simples - SEM CONFLITO COM BARRA DE ROLAGEM
         hoje = datetime.now()
-        fig.add_scatter(
-            x=[hoje, hoje],
-            y=[df['Nome do Projeto'].iloc[0], df['Nome do Projeto'].iloc[-1]],
-            mode='lines',
-            line=dict(color='red', width=3, dash='dash'),
-            name='HOJE',
-            showlegend=False,
-            hoverinfo='skip'
+        fig.add_annotation(
+            x=hoje,
+            y=len(df),  # Posicionar acima do último projeto
+            text="📍 HOJE",
+            showarrow=True,
+            arrowhead=2,
+            arrowcolor="red",
+            arrowsize=1,
+            arrowwidth=2,
+            bgcolor="red",
+            bordercolor="red",
+            font=dict(color="white", size=10),
+            yshift=10
         )
         
         st.plotly_chart(fig, use_container_width=True)
