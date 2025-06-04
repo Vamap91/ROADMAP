@@ -145,13 +145,10 @@ with st.sidebar:
             else:
                 st.error("❌ Verifique os dados!")
 
-# Área principal - dividida em duas colunas
-col1, col2 = st.columns([3, 1])
+# Área principal - FOCO TOTAL NOS PROJETOS
+st.subheader("📊 Cronograma dos Projetos")
 
-with col1:
-    st.subheader("📊 Cronograma dos Projetos")
-    
-    if not df.empty:
+if not df.empty:
         # Criar gráfico de Gantt com barra de rolagem
         fig = px.timeline(
             df,
@@ -163,68 +160,83 @@ with col1:
             text="Nome do Projeto"
         )
         
-        # Configurar altura e barra de rolagem
+        # Configurar altura e barra de rolagem - AUMENTADA
         fig.update_layout(
-            height=400,
+            height=600,  # Altura maior para melhor visualização
             xaxis=dict(
                 rangeslider=dict(visible=True),
                 type="date"
-            )
+            ),
+            showlegend=True,
+            margin=dict(l=200, r=50, t=80, b=100)  # Margens ajustadas
         )
         fig.update_traces(textposition="inside", textfont_size=12)
         
-        # Adicionar linha vermelha para "hoje"
-        hoje = datetime.now()
-        fig.add_shape(
-            type="line",
-            x0=hoje, x1=hoje,
-            y0=-0.5, y1=len(df)-0.5,
-            line=dict(color="red", width=3, dash="dash")
-        )
-        
-        # Adicionar anotação "HOJE"
-        fig.add_annotation(
+        # Adicionar linha vermelha para "hoje" - CORRIGIDA
+        hoje = datetime.now().date()
+        fig.add_vline(
             x=hoje,
-            y=len(df)-0.5,
-            text="HOJE",
-            showarrow=True,
-            arrowhead=2,
-            arrowcolor="red",
-            bgcolor="red",
-            bordercolor="red",
-            font=dict(color="white", size=12)
+            line_width=3,
+            line_dash="dash",
+            line_color="red",
+            annotation_text="HOJE",
+            annotation_position="top"
         )
         
         st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Adicione projetos na barra lateral para ver o cronograma!")
+else:
+    st.info("Adicione projetos na barra lateral para ver o cronograma!")
 
-with col2:
-    st.subheader("📈 Resumo")
-    
-    if not df.empty:
-        total = len(df)
-        hoje = datetime.now().date()
-        
-        em_andamento = len(df[
-            (df['Início'] <= hoje) & (df['Fim'] >= hoje)
-        ])
-        
-        futuros = len(df[df['Início'] > hoje])
-        
-        st.metric("Total de Projetos", total)
-        st.metric("Em Andamento", em_andamento)
-        st.metric("Futuros", futuros)
-        
-        st.subheader("👥 Por Responsável")
-        responsaveis = df['Responsável'].value_counts()
-        for resp, count in responsaveis.items():
-            st.write(f"• {resp}: {count}")
-
-# Seção para editar/excluir projetos
-st.header("✏️ Gerenciar Projetos")
+# Resumo compacto na parte inferior
+st.subheader("📈 Resumo dos Projetos")
 
 if not df.empty:
+    col_metricas1, col_metricas2, col_metricas3, col_metricas4 = st.columns(4)
+    
+    total = len(df)
+    hoje = datetime.now().date()
+    
+    em_andamento = len(df[(df['Início'] <= hoje) & (df['Fim'] >= hoje)])
+    concluidos = len(df[df['Fim'] < hoje])  # Projetos que já terminaram
+    futuros = len(df[df['Início'] > hoje])
+    atrasados = total - em_andamento - concluidos - futuros  # Cálculo dos atrasados
+    
+    with col_metricas1:
+        st.metric("📊 Total", total)
+    with col_metricas2:
+        st.metric("🟢 Em Andamento", em_andamento)
+    with col_metricas3:
+        st.metric("📅 Futuros", futuros)
+    with col_metricas4:
+        st.metric("✅ Concluídos", concluidos)
+    
+    # Resumo por responsável em uma linha
+    st.write("**👥 Por Responsável:**")
+    responsaveis = df['Responsável'].value_counts()
+    responsavel_texto = " | ".join([f"**{resp}**: {count}" for resp, count in responsaveis.items()])
+    st.markdown(responsavel_texto)
+
+# Seção para editar/excluir projetos - AGORA COM BOTÃO PARA MOSTRAR/OCULTAR
+st.header("✏️ Gerenciar Projetos")
+
+# Botão para mostrar/ocultar opções de gerenciamento
+if 'mostrar_gerenciamento' not in st.session_state:
+    st.session_state.mostrar_gerenciamento = False
+
+col_btn, col_info = st.columns([1, 3])
+
+with col_btn:
+    if st.button("⚙️ Mostrar/Ocultar Opções de Gerenciamento"):
+        st.session_state.mostrar_gerenciamento = not st.session_state.mostrar_gerenciamento
+
+with col_info:
+    if st.session_state.mostrar_gerenciamento:
+        st.info("🔧 **Modo Gerenciamento Ativo** - Use as abas abaixo para editar/excluir projetos")
+    else:
+        st.info("👁️ **Modo Visualização** - Clique no botão ao lado para acessar opções de gerenciamento")
+
+# Mostrar opções de gerenciamento apenas se solicitado
+if st.session_state.mostrar_gerenciamento and not df.empty:
     # Abas para diferentes operações
     tab1, tab2, tab3 = st.tabs(["📝 Editar Projeto", "📋 Projetos Atuais", "🗑️ Excluir"])
     
@@ -338,8 +350,12 @@ if not df.empty:
             with col_cancel:
                 if st.button("❌ Cancelar"):
                     st.rerun()
+elif not df.empty:
+    # Mostrar apenas a tabela quando o gerenciamento está oculto
+    st.subheader("📋 Lista de Projetos")
+    st.dataframe(df.drop('ID', axis=1), use_container_width=True)  # Ocultar coluna ID
 
 # Footer
 st.markdown("---")
-st.markdown("💡 **Dica**: Todos os dados são salvos automaticamente no seu PC!")
-st.markdown(f"📂 **Localização:** `{CAMINHO_DADOS}`")
+st.markdown("💡 **Dica**: Use a barra lateral para adicionar projetos. Clique em 'Mostrar Opções' para editar/excluir.")
+st.markdown(f"📂 **Localização dos dados:** `{CAMINHO_DADOS}`")
