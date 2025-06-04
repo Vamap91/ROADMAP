@@ -194,15 +194,21 @@ if not df.empty:
             text="Nome do Projeto"
         )
         
-        # Configurar altura e barra de rolagem - AUMENTADA
+        # Configurar altura e barra de rolagem - CORRIGINDO OVERLAP
         fig.update_layout(
             height=600,  # Altura maior para melhor visualização
             xaxis=dict(
-                rangeslider=dict(visible=True),
+                rangeslider=dict(
+                    visible=True,
+                    thickness=0.1  # Fazer a barra de rolagem mais fina
+                ),
                 type="date"
             ),
             showlegend=False,  # Remover legenda já que cada projeto tem cor única
-            margin=dict(l=200, r=50, t=80, b=100)  # Margens ajustadas
+            margin=dict(l=250, r=50, t=80, b=150),  # Aumentar margem esquerda e inferior
+            yaxis=dict(
+                side="left"  # Garantir que os nomes fiquem à esquerda
+            )
         )
         
         # Configurar texto nas barras - NEGRITO E MAIOR
