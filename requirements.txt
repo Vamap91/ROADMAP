@@ -1,1 +1,4 @@
 streamlit
+pandas
+plotly
+openpyxl # Necessário se você quiser usar Excel em vez de CSV
