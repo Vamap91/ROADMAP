@@ -159,31 +159,25 @@ with st.sidebar:
     st.markdown("---")
     st.header("🎨 Cores dos Projetos")
     
-    # Cores padrão para cada responsável
-    cores_padrao = {
-        'Backend Team': '#FF6B6B',
-        'Frontend Team': '#4ECDC4', 
-        'Data Team': '#45B7D1',
-        'Mobile Team': '#96CEB4',
-        'QA Team': '#FFEAA7',
-        'DevOps Team': '#DDA0DD'
-    }
+    # Inicializar cores individuais para cada projeto
+    if 'cores_projetos' not in st.session_state:
+        cores_default = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#FFB6C1']
+        st.session_state.cores_projetos = {}
     
-    # Inicializar cores no session_state se não existir
-    if 'cores_personalizadas' not in st.session_state:
-        st.session_state.cores_personalizadas = cores_padrao.copy()
-    
-    # Mostrar seletores de cor para cada responsável
-    responsaveis_unicos = df['Responsável'].unique() if not df.empty else list(cores_padrao.keys())
-    
-    for responsavel in responsaveis_unicos:
-        cor_atual = st.session_state.cores_personalizadas.get(responsavel, cores_padrao.get(responsavel, '#FF6B6B'))
-        nova_cor = st.color_picker(
-            f"🎨 {responsavel}:",
-            value=cor_atual,
-            key=f"cor_{responsavel}"
-        )
-        st.session_state.cores_personalizadas[responsavel] = nova_cor
+    # Mostrar seletor de cor para cada projeto individualmente
+    if not df.empty:
+        for idx, projeto in enumerate(df['Nome do Projeto']):
+            if projeto not in st.session_state.cores_projetos:
+                # Atribuir cor padrão se não existir
+                cores_default = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#FFB6C1']
+                st.session_state.cores_projetos[projeto] = cores_default[idx % len(cores_default)]
+            
+            nova_cor = st.color_picker(
+                f"🎨 {projeto[:20]}{'...' if len(projeto) > 20 else ''}:",
+                value=st.session_state.cores_projetos[projeto],
+                key=f"cor_projeto_{idx}"
+            )
+            st.session_state.cores_projetos[projeto] = nova_cor
 
 # Área principal - FOCO TOTAL NOS PROJETOS
 st.subheader("📊 Cronograma dos Projetos")
@@ -207,10 +201,16 @@ if not df.empty:
                 rangeslider=dict(visible=True),
                 type="date"
             ),
-            showlegend=True,
+            showlegend=False,  # Remover legenda já que cada projeto tem cor única
             margin=dict(l=200, r=50, t=80, b=100)  # Margens ajustadas
         )
-        fig.update_traces(textposition="inside", textfont_size=12)
+        
+        # Configurar texto nas barras - NEGRITO E MAIOR
+        fig.update_traces(
+            textposition="inside", 
+            textfont=dict(size=14, color="white", family="Arial Black"),  # Fonte maior, branca e em negrito
+            texttemplate="<b>%{text}</b>"  # Forçar negrito no texto
+        )
         
         # Adicionar linha vermelha "HOJE" de forma simples e segura
         hoje = datetime.now()
