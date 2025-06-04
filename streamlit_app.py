@@ -38,12 +38,16 @@ def load_projects_data():
         return df
 
 def save_projects_data(df):
-    df['Início Previsto'] = df['Início Previsto'].dt.strftime('%Y-%m-%d') # Formata para salvar como string
-    df['Fim Previsto'] = df['Fim Previsto'].dt.strftime('%Y-%m-%d')
-    df.to_csv(PROJECTS_FILE, index=False)
-    st.session_state['projects_df'] = load_projects_data() # Recarrega o cache para refletir as mudanças
+    # Converte de volta para string para salvar no CSV de forma consistente
+    df_to_save = df.copy() # Cria uma cópia para não alterar o DataFrame em memória que está em datetime
+    df_to_save['Início Previsto'] = df_to_save['Início Previsto'].dt.strftime('%Y-%m-%d')
+    df_to_save['Fim Previsto'] = df_to_save['Fim Previsto'].dt.strftime('%Y-%m-%d')
+    df_to_save.to_csv(PROJECTS_FILE, index=False)
+    # Recarrega o DataFrame após salvar para garantir que o cache e o session_state estejam atualizados
+    st.session_state['projects_df'] = load_projects_data()
 
 # Inicializa o DataFrame no session_state para persistir durante a sessão
+# Isso é crucial para que o estado do DataFrame não se perca após updates
 if 'projects_df' not in st.session_state:
     st.session_state['projects_df'] = load_projects_data()
 
@@ -67,14 +71,16 @@ default_color_map = {
 }
 
 # Pegar todos os valores únicos de 'Responsável/Status' do DataFrame
-all_statuses = df_projects['Responsável/Status'].unique()
+# Garante que todos os status, inclusive os de novos projetos, apareçam na sidebar
+all_statuses = sorted(df_projects['Responsável/Status'].unique().tolist()) # Ordena para consistência
 configured_colors = {}
 
 for status in all_statuses:
     # Use st.color_picker para permitir a seleção de cores pelo usuário
     configured_colors[status] = st.sidebar.color_picker(
         f"Cor para '{status}'",
-        value=default_color_map.get(status, '#CCCCCC') # Usa cor padrão ou cinza claro
+        value=default_color_map.get(status, '#CCCCCC'), # Usa cor padrão ou cinza claro
+        key=f"color_picker_{status}" # Adiciona uma key única para o color_picker
     )
 
 st.sidebar.markdown("---") # Linha divisória na sidebar
@@ -127,10 +133,9 @@ fig.update_layout(
 # Exibir o gráfico no Streamlit
 st.plotly_chart(fig, use_container_width=True)
 
-
-
-# ## 🚀 Edição e Gerenciamento de Projetos
-
+---
+# --- Seção de Edição e Gerenciamento de Projetos ---
+st.markdown("## 🚀 Edição e Gerenciamento de Projetos")
 st.markdown("Aqui você pode **adicionar novos projetos**, **atualizar prazos** e **responsáveis**.")
 
 # Usamos um container para agrupar os elementos de edição
@@ -138,17 +143,23 @@ with st.container(border=True):
     st.subheader("📝 Editar Projetos Existentes")
 
     # Opção de edição via selectbox
-    selected_project_name = st.selectbox(
-        "Selecione um projeto para atualizar:",
-        options=df_projects['Projeto'].tolist(),
-        key="project_selector" # Chave única para o widget
-    )
+    # Garante que o selectbox não tenta selecionar um projeto que não existe mais após uma deleção (se implementado)
+    if not df_projects.empty:
+        selected_project_name = st.selectbox(
+            "Selecione um projeto para atualizar:",
+            options=df_projects['Projeto'].tolist(),
+            key="project_selector" # Chave única para o widget
+        )
+    else:
+        selected_project_name = None
+        st.info("Nenhum projeto para editar. Adicione um novo projeto abaixo!")
 
     # Encontrar o projeto selecionado e exibir seus detalhes para edição
     if selected_project_name:
         project_index = df_projects[df_projects['Projeto'] == selected_project_name].index[0]
         
         # Recupera os valores atuais
+        # Garante que as datas sejam objects do tipo date para st.date_input
         current_start = df_projects.loc[project_index, 'Início Previsto'].date()
         current_end = df_projects.loc[project_index, 'Fim Previsto'].date()
         current_status_resp = df_projects.loc[project_index, 'Responsável/Status']
@@ -159,118 +170,86 @@ with st.container(border=True):
             new_start_date = st.date_input(
                 "Início Previsto",
                 value=current_start,
-                key=f"start_{selected_project_name}"
+                key=f"start_{selected_project_name}_edit" # Chave única para o widget
             )
         with col2:
             new_end_date = st.date_input(
                 "Fim Previsto",
                 value=current_end,
-                key=f"end_{selected_project_name}"
+                key=f"end_{selected_project_name}_edit" # Chave única para o widget
             )
         with col3:
+            # Garante que as options do selectbox são os valores únicos + os valores que você configurou
+            # Isso permite adicionar novos "responsáveis/status" ao digitar no "Adicionar Novo Projeto"
+            all_possible_statuses = sorted(list(set(df_projects['Responsável/Status'].unique().tolist() + list(default_color_map.keys()))))
+            if current_status_resp not in all_possible_statuses:
+                all_possible_statuses.insert(0, current_status_resp) # Garante que o valor atual esteja na lista
+
             new_status_resp = st.selectbox(
                 "Responsável / Status",
-                options=list(configured_colors.keys()), # Usa as chaves do dicionário de cores
-                index=list(configured_colors.keys()).index(current_status_resp) if current_status_resp in configured_colors else 0,
-                key=f"status_resp_{selected_project_name}"
+                options=all_possible_statuses,
+                index=all_possible_statuses.index(current_status_resp) if current_status_resp in all_possible_statuses else 0,
+                key=f"status_resp_{selected_project_name}_edit" # Chave única para o widget
             )
         
         # Botão para salvar as alterações
         if st.button(f"💾 Salvar Alterações para '{selected_project_name}'", key=f"save_btn_{selected_project_name}"):
-            df_projects.loc[project_index, 'Início Previsto'] = new_start_date
-            df_projects.loc[project_index, 'Fim Previsto'] = new_end_date
-            df_projects.loc[project_index, 'Responsável/Status'] = new_status_resp
+            # Atualiza o DataFrame no session_state diretamente
+            st.session_state['projects_df'].loc[project_index, 'Início Previsto'] = new_start_date
+            st.session_state['projects_df'].loc[project_index, 'Fim Previsto'] = new_end_date
+            st.session_state['projects_df'].loc[project_index, 'Responsável/Status'] = new_status_resp
             
-            save_projects_data(df_projects) # Salva no CSV
+            save_projects_data(st.session_state['projects_df']) # Salva no CSV
             st.success(f"✅ Projeto '{selected_project_name}' atualizado e salvo!")
             st.rerun() # Força a aplicação a recarregar e mostrar as mudanças
 
 ---
-
-## ✨ Adicionar Novo Projeto
+# --- Seção de Adição de Novo Projeto ---
+st.markdown("## ✨ Adicionar Novo Projeto")
 
 with st.container(border=True):
     st.subheader("➕ Adicionar um Novo Projeto")
     
     with st.form("add_project_form"):
-        new_project_name = st.text_input("Nome do Novo Projeto")
+        new_project_name = st.text_input("Nome do Novo Projeto", key="new_project_name_input")
         col_new1, col_new2, col_new3 = st.columns(3)
         with col_new1:
-            new_project_start = st.date_input("Início Previsto", value=datetime.date.today())
+            new_project_start = st.date_input("Início Previsto", value=datetime.date.today(), key="new_project_start_input")
         with col_new2:
-            new_project_end = st.date_input("Fim Previsto", value=datetime.date.today() + datetime.timedelta(days=30))
+            new_project_end = st.date_input("Fim Previsto", value=datetime.date.today() + datetime.timedelta(days=30), key="new_project_end_input")
         with col_new3:
-            new_project_status_resp = st.selectbox(
+            # Opções para o novo projeto, incluindo uma para o usuário digitar um novo status
+            # Criamos uma lista combinando os status existentes e uma opção para "Outro (digite abaixo)"
+            all_possible_statuses = sorted(list(set(df_projects['Responsável/Status'].unique().tolist() + list(default_color_map.keys()))))
+            
+            selected_new_status = st.selectbox(
                 "Responsável / Status",
-                options=list(configured_colors.keys()),
-                index=0 # Padrão para o primeiro status
+                options=all_possible_statuses + ["Outro (digite abaixo)"],
+                key="new_project_status_select"
             )
-        
+            
+            new_project_status_resp = selected_new_status
+            # Se o usuário selecionou "Outro", permite que ele digite o novo status
+            if selected_new_status == "Outro (digite abaixo)":
+                custom_status = st.text_input("Digite o novo status/responsável:", key="custom_status_input")
+                if custom_status: # Só usa o custom_status se algo foi digitado
+                    new_project_status_resp = custom_status
+
         submitted = st.form_submit_button("Criar Novo Projeto")
         if submitted:
-            if new_project_name and new_project_name not in df_projects['Projeto'].tolist():
+            if not new_project_name:
+                st.error("❗ O nome do projeto não pode ser vazio.")
+            elif new_project_name in df_projects['Projeto'].tolist():
+                st.warning("⚠️ Um projeto com esse nome já existe. Por favor, escolha outro nome.")
+            else:
                 new_row = pd.DataFrame([{
                     'Projeto': new_project_name,
                     'Início Previsto': new_project_start,
                     'Fim Previsto': new_project_end,
                     'Responsável/Status': new_project_status_resp
                 }])
-                df_projects = pd.concat([df_projects, new_row], ignore_index=True)
-                save_projects_data(df_projects) # Salva no CSV
+                # Concatena com o DataFrame no session_state
+                st.session_state['projects_df'] = pd.concat([st.session_state['projects_df'], new_row], ignore_index=True)
+                save_projects_data(st.session_state['projects_df']) # Salva no CSV
                 st.success(f"🎉 Projeto '{new_project_name}' adicionado e salvo!")
                 st.rerun() # Força a aplicação a recarregar
-            elif new_project_name:
-                st.warning("⚠️ Um projeto com esse nome já existe. Por favor, escolha outro nome.")
-            else:
-                st.error("❗ O nome do projeto não pode ser vazio.")
-
----
-
-### 3. `README.md` (Exemplo)
-
-```markdown
-# ROADMAP de Projetos
-
-Esta é uma aplicação interativa de ROADMAP desenvolvida com Streamlit e Plotly.
-
-## Funcionalidades
-
--   **Visualização de Gantt:** Veja o cronograma de seus projetos de forma clara e visual.
--   **Edição de Prazos:** Ajuste as datas de início e fim dos projetos diretamente na interface.
--   **Dados Persistentes:** As alterações são salvas e carregadas automaticamente (via `data/projects.csv`).
--   **Cores Configuráveis:** Defina as cores para diferentes status ou responsáveis diretamente na barra lateral.
--   **Adicionar Novos Projetos:** Crie novos projetos com seus prazos e responsáveis.
-
-## Como Executar Localmente
-
-1.  **Clone o repositório:**
-    ```bash
-    git clone https://github.com/seu-usuario/ROADMAP.git
-    cd ROADMAP
-    ```
-2.  **Crie um ambiente virtual (recomendado):**
-    ```bash
-    python -m venv venv
-    source venv/bin/activate  # No Windows: `venv\Scripts\activate`
-    ```
-3.  **Instale as dependências:**
-    ```bash
-    pip install -r requirements.txt
-    ```
-4.  **Execute a aplicação:**
-    ```bash
-    streamlit run streamlit_app.py
-    ```
-    A aplicação será aberta automaticamente no seu navegador.
-
-## Como Fazer Deploy no Streamlit Community Cloud
-
-1.  Certifique-se de que seus arquivos (`streamlit_app.py`, `requirements.txt`, `README.md` e a pasta `data/` com `projects.csv` se quiser dados iniciais) estejam no seu repositório GitHub.
-2.  Vá para [share.streamlit.io](https://share.streamlit.io/).
-3.  Faça login com sua conta GitHub.
-4.  Clique em "New app" e selecione seu repositório e o arquivo `streamlit_app.py`.
-5.  Clique em "Deploy!".
-
-## Contribuindo
-
-Sinta-se à vontade para abrir issues ou pull requests para melhorias.
