@@ -237,21 +237,29 @@ if not df.empty:
             texttemplate="<b>%{text}</b>"  # Forçar negrito no texto
         )
         
-        # LINHA VERMELHA "HOJE" BEM GROSSA E VISÍVEL
+        # LINHA VERMELHA "HOJE" - MÉTODO SIMPLES E SEGURO
         hoje = datetime.now()
-        fig.add_vline(
-            x=hoje,
-            line_width=6,  # LINHA BEM GROSSA
-            line_color="red",
-            line_dash="solid",  # Linha sólida em vez de tracejada
-            annotation_text="🔴 HOJE",
-            annotation_position="top",
-            annotation=dict(
-                font=dict(size=14, color="red", family="Arial Black"),
-                bgcolor="white",
-                bordercolor="red",
-                borderwidth=2
+        fig.add_shape(
+            type="line",
+            x0=hoje, x1=hoje,
+            y0=-0.5, y1=len(df)-0.5,
+            line=dict(
+                color="red",
+                width=6,  # LINHA BEM GROSSA
+                dash="solid"
             )
+        )
+        
+        # Adicionar texto "HOJE" 
+        fig.add_annotation(
+            x=hoje,
+            y=len(df)-0.3,
+            text="🔴 HOJE",
+            showarrow=False,
+            font=dict(size=14, color="red", family="Arial Black"),
+            bgcolor="white",
+            bordercolor="red",
+            borderwidth=2
         )
         
         st.plotly_chart(fig, use_container_width=True)
