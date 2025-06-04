@@ -172,15 +172,16 @@ if not df.empty:
         )
         fig.update_traces(textposition="inside", textfont_size=12)
         
-        # Adicionar linha vermelha para "hoje" - CORRIGIDA
-        hoje = datetime.now().date()
-        fig.add_vline(
-            x=hoje,
-            line_width=3,
-            line_dash="dash",
-            line_color="red",
-            annotation_text="HOJE",
-            annotation_position="top"
+        # Adicionar linha vermelha "HOJE" de forma simples e segura
+        hoje = datetime.now()
+        fig.add_scatter(
+            x=[hoje, hoje],
+            y=[df['Nome do Projeto'].iloc[0], df['Nome do Projeto'].iloc[-1]],
+            mode='lines',
+            line=dict(color='red', width=3, dash='dash'),
+            name='HOJE',
+            showlegend=False,
+            hoverinfo='skip'
         )
         
         st.plotly_chart(fig, use_container_width=True)
