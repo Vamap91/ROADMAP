@@ -194,24 +194,29 @@ if not df.empty:
             text="Nome do Projeto"
         )
         
-        # Configurar altura e barra de rolagem - LAYOUT OTIMIZADO
+        # Configurar altura e barra de rolagem - CORREÇÃO DEFINITIVA
         fig.update_layout(
-            height=700,  # Altura maior para acomodar tudo
+            height=800,  # Altura bem maior
             xaxis=dict(
                 rangeslider=dict(
                     visible=True,
-                    thickness=0.08  # Barra de rolagem bem fina
+                    thickness=0.05,  # Barra muito fina
+                    bgcolor="lightgray",
+                    bordercolor="gray",
+                    borderwidth=1
                 ),
                 type="date",
-                title="📅 Cronograma"
+                title="📅 Cronograma",
+                domain=[0, 1]  # Usar todo o espaço horizontal
             ),
             yaxis=dict(
                 title="🎯 Projetos",
-                automargin=True  # Margem automática para nomes
+                domain=[0.15, 1]  # Deixar 15% do espaço na parte inferior para a barra de rolagem
             ),
             showlegend=False,
-            margin=dict(l=50, r=50, t=100, b=120),  # Margens balanceadas
-            autosize=True
+            margin=dict(l=100, r=50, t=80, b=200),  # Margem inferior maior para a barra de rolagem
+            plot_bgcolor='white',
+            paper_bgcolor='white'
         )
         
         # Configurar texto nas barras - NEGRITO E MAIOR
