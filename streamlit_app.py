@@ -113,10 +113,102 @@ with col1:
             x_end="Fim",
             y="Nome do Projeto",
             color="Responsável",
-            title="Timeline dos Projetos"
+            title="Timeline dos Projetos",
+            text="Nome do Projeto"  # Adicionar texto nas barras
         )
         
+        # Configurar altura e mostrar texto nas barras
         fig.update_layout(height=400)
+        fig.update_traces(textposition="inside", textfont_size=12)
+        
+        # Adicionar linha vermelha para "hoje"
+        hoje = datetime.now()
+        fig.add_shape(
+            type="line",
+            x0=hoje, x1=hoje,
+            y0=-0.5, y1=len(df)-0.5,
+            line=dict(color="red", width=3, dash="dash")
+        )
+        
+        # Adicionar anotação "HOJE"
+        fig.add_annotation(
+            x=hoje,
+            y=len(df)-0.5,
+            text="HOJE",
+            showarrow=True,
+            arrowhead=2,
+            arrowcolor="red",
+            bgcolor="red",
+            bordercolor="red",
+            font=dict(color="white", size=12)
+        )
+        
+        # Configurar eixo X para mostrar quinzenas
+        fig.update_xaxes(
+            dtick="M1",  # Intervalo mensal
+            tickformat="%b\n%Y",  # Formato do mês
+            ticklabelmode="period"
+        )
+        
+        # Adicionar linhas verticais para quinzenas
+        # Pegar range de datas dos projetos
+        data_min = df['Início'].min()
+        data_max = df['Fim'].max()
+        
+        # Gerar datas de quinzenas no período
+        from dateutil.relativedelta import relativedelta
+        import calendar
+        
+        current_date = data_min.replace(day=1)  # Primeiro dia do mês inicial
+        end_date = data_max + relativedelta(months=1)
+        
+        while current_date <= end_date:
+            # Primeira quinzena (dia 1)
+            fig.add_vline(
+                x=current_date,
+                line_width=1,
+                line_dash="dot",
+                line_color="gray",
+                opacity=0.5
+            )
+            
+            # Segunda quinzena (dia 16)
+            dia_16 = current_date.replace(day=16)
+            fig.add_vline(
+                x=dia_16,
+                line_width=1,
+                line_dash="dot", 
+                line_color="gray",
+                opacity=0.5
+            )
+            
+            # Adicionar labels das quinzenas
+            mes_nome = current_date.strftime("%b")
+            ano = current_date.strftime("%Y")
+            
+            # Label primeira quinzena
+            fig.add_annotation(
+                x=current_date + relativedelta(days=7),  # Meio da primeira quinzena
+                y=-0.7,
+                text=f"01-15/{mes_nome}",
+                showarrow=False,
+                font=dict(size=10, color="gray"),
+                xanchor="center"
+            )
+            
+            # Label segunda quinzena
+            ultimo_dia = calendar.monthrange(current_date.year, current_date.month)[1]
+            fig.add_annotation(
+                x=dia_16 + relativedelta(days=7),  # Meio da segunda quinzena
+                y=-0.7,
+                text=f"16-{ultimo_dia}/{mes_nome}",
+                showarrow=False,
+                font=dict(size=10, color="gray"),
+                xanchor="center"
+            )
+            
+            # Próximo mês
+            current_date += relativedelta(months=1)
         
         st.plotly_chart(fig, use_container_width=True)
     else:
