@@ -120,7 +120,7 @@ with col1:
         
         # Adicionar linha "hoje"
         fig.add_vline(
-            x=datetime.now(),
+            x=datetime.now().date(),
             line_dash="dash",
             line_color="red",
             annotation_text="Hoje"
