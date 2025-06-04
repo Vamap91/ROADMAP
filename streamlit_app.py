@@ -133,7 +133,10 @@ fig.update_layout(
 # Exibir o gráfico no Streamlit
 st.plotly_chart(fig, use_container_width=True)
 
----
+
+# --- Separador Visual (linha horizontal) ---
+st.markdown("---") 
+
 # --- Seção de Edição e Gerenciamento de Projetos ---
 st.markdown("## 🚀 Edição e Gerenciamento de Projetos")
 st.markdown("Aqui você pode **adicionar novos projetos**, **atualizar prazos** e **responsáveis**.")
@@ -203,7 +206,9 @@ with st.container(border=True):
             st.success(f"✅ Projeto '{selected_project_name}' atualizado e salvo!")
             st.rerun() # Força a aplicação a recarregar e mostrar as mudanças
 
----
+# --- Separador Visual (linha horizontal) ---
+st.markdown("---")
+
 # --- Seção de Adição de Novo Projeto ---
 st.markdown("## ✨ Adicionar Novo Projeto")
 
